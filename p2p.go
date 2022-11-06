@@ -168,9 +168,7 @@ func (p *P2P) discover(target string) error {
 		return fmt.Errorf("failed creating request: %w", err)
 	}
 
-	source := []byte(p.current.ID + p.current.Name + p.current.Addr + p.key)
-	signature := fmt.Sprintf("%x", sha256.Sum256(source))
-	req.Header.Set("X-Signature", signature)
+	req.Header.Set("X-Signature", p.signature(p.current))
 	req.Header.Set("Content-Type", "application/json")
 
 	var h http.Client
@@ -194,6 +192,11 @@ func (p *P2P) discover(target string) error {
 		p.register(cl)
 	}
 	return nil
+}
+
+func (p *P2P) signature(client *Client) string {
+	source := []byte(client.ID + client.Name + client.Addr + p.key)
+	return fmt.Sprintf("%x", sha256.Sum256(source))
 }
 
 func (p *P2P) notify() {
