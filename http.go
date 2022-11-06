@@ -96,7 +96,7 @@ func HttpAPIHandle(p2p *P2P, mx *http.ServeMux) {
 			return
 		}
 
-		if r.Header.Get("X-Signature") != p2p.signature(p2p.current) {
+		if r.Header.Get("X-Signature") != p2p.signature(message.From) {
 			w.WriteHeader(http.StatusUnauthorized)
 			json.NewEncoder(w).Encode(map[string]any{"error": "invalid signature"})
 			return
