@@ -20,19 +20,23 @@ var DefaultHandler = HandlerFunc(func(ctx context.Context, m *Message) (any, err
 	return data, nil
 })
 
-type MuxHandler struct {
+type ServeMux struct {
 	handlers map[string]Handler
 }
 
-func (mx *MuxHandler) Handle(subject string, handler Handler) {
+func NewServeMux() *ServeMux {
+	return &ServeMux{handlers: make(map[string]Handler)}
+}
+
+func (mx *ServeMux) Handle(subject string, handler Handler) {
 	mx.handlers[subject] = handler
 }
 
-func (mx *MuxHandler) HandleFunc(subject string, handler func(context.Context, *Message) (any, error)) {
+func (mx *ServeMux) HandleFunc(subject string, handler func(context.Context, *Message) (any, error)) {
 	mx.Handle(subject, HandlerFunc(handler))
 }
 
-func (mx *MuxHandler) ServeP2P(ctx context.Context, m *Message) (any, error) {
+func (mx *ServeMux) ServeP2P(ctx context.Context, m *Message) (any, error) {
 	h, ok := mx.handlers[m.Subject]
 	if ok {
 		return h.ServeP2P(ctx, m)
