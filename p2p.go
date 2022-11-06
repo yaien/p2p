@@ -33,6 +33,7 @@ type P2P struct {
 	channel chan *State
 	mutex   sync.RWMutex
 	addr    string
+	handler Handler
 }
 
 type Options struct {
@@ -60,6 +61,7 @@ func New(opts Options) *P2P {
 		key:     opts.Key,
 		clients: make(map[string]*Client),
 		channel: make(chan *State),
+		handler: DefaultHandler,
 	}
 
 	return p

@@ -74,13 +74,43 @@ func HttpAPIHandle(p2p *P2P, mx *http.ServeMux) {
 		err = p2p.Save(signature, &cl)
 		if err != nil {
 			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(401)
+			w.WriteHeader(http.StatusUnauthorized)
 			json.NewEncoder(w).Encode(map[string]any{"error": err.Error()})
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(200)
+		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(p2p.State())
+	}))
+
+	mx.Handle("/api/handle", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		w.Header().Set("content-type", "application/json")
+
+		var message Message
+		err := json.NewDecoder(r.Body).Decode(&message)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]any{"error": err.Error()})
+			return
+		}
+
+		if r.Header.Get("X-Signature") != p2p.signature(p2p.current) {
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(map[string]any{"error": "invalid signature"})
+			return
+		}
+
+		data, err := p2p.handler.Handle(r.Context(), &message)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]any{"error": err.Error()})
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]any{"data": data})
+
 	}))
 }

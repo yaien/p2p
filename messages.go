@@ -2,6 +2,7 @@ package p2p
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,11 +13,31 @@ import (
 var ErrNoneMatchedPeers = errors.New("none peer matched the pattern")
 
 type Message struct {
-	From *Client `json:"from"`
-	Body any     `json:"body"`
+	From    *Client `json:"from"`
+	Subject string  `json:"string"`
+	Body    any     `json:"body"`
 }
 
-func (p *P2P) Broadcast(pattern string, body any) error {
+type Handler interface {
+	Handle(ctx context.Context, m *Message) (data any, err error)
+}
+
+type HandlerFunc func(ctx context.Context, m *Message) (any, error)
+
+func (h HandlerFunc) Handle(ctx context.Context, m *Message) (any, error) {
+	return h(ctx, m)
+}
+
+var DefaultHandler = HandlerFunc(func(ctx context.Context, m *Message) (any, error) {
+	data := map[string]any{"status": "received", "subject": m.Subject, "sender": m.From, "body": m.Body}
+	return data, nil
+})
+
+func (p *P2P) Handle(h Handler) {
+	p.handler = h
+}
+
+func (p *P2P) Broadcast(pattern string, subj string, body any) error {
 	regex, err := regexp.Compile(pattern)
 	if err != nil {
 		return fmt.Errorf("invalid pattern: %w", err)
