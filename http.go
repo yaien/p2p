@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+
+	"github.com/yaien/p2p/site"
 )
 
 // HttpHandler combine the ui handler and the connect handler
@@ -17,7 +19,7 @@ func HttpUIHandle(p2p *P2P, mx *http.ServeMux) {
 
 	sb := NewSubscriber(p2p.Channel())
 
-	mx.Handle("/p2p/", http.StripPrefix("/p2p/", http.FileServer(http.Dir("./static"))))
+	mx.Handle("/p2p/", http.StripPrefix("/p2p/", http.FileServer(http.FS(site.FS))))
 
 	mx.Handle("/p2p/sse", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
