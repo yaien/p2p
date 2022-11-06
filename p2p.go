@@ -109,8 +109,7 @@ func (p *P2P) Start() {
 }
 
 func (p *P2P) Save(signature string, client *Client) error {
-	source := []byte(client.ID + client.Name + client.Addr + p.key)
-	hash := fmt.Sprintf("%x", sha256.Sum256(source))
+	hash := p.signature(client)
 	if hash != signature {
 		return ErrInvalidSignature
 	}

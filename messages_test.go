@@ -2,37 +2,30 @@ package p2p
 
 import (
 	"context"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
-
-	"github.com/google/uuid"
 )
 
 func TestP2P_Broadcast(t *testing.T) {
-	mx := http.NewServeMux()
 	p2p := New(Options{})
-	HttpAPIHandle(p2p, mx)
 
+	mx := http.NewServeMux()
 	srv := httptest.NewServer(mx)
 	defer srv.Close()
 
-	p2p.register(&Client{
-		ID:        uuid.New().String(),
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-		Addr:      srv.URL,
-		Name:      "test-p2p-peer",
-	})
+	target := New(Options{Addr: srv.URL, Name: "target-p2p"})
 
 	var called bool
-	p2p.Handle(HandlerFunc(func(ctx context.Context, m *Message) (any, error) {
+	target.Handle(HandlerFunc(func(ctx context.Context, m *Message) (any, error) {
 		called = true
-		log.Println("message received", m)
+		t.Log("message received", m)
 		return "received", nil
 	}))
+
+	HttpAPIHandle(target, mx)
+
+	p2p.register(target.current)
 
 	err := p2p.Broadcast("*", "message", "Hello World")
 	if err != nil {
@@ -45,29 +38,31 @@ func TestP2P_Broadcast(t *testing.T) {
 }
 
 func TestP2P_Request(t *testing.T) {
-	mx := http.NewServeMux()
 	p2p := New(Options{})
-	HttpAPIHandle(p2p, mx)
 
+	mx := http.NewServeMux()
 	srv := httptest.NewServer(mx)
 	defer srv.Close()
 
-	p2p.register(&Client{
-		ID:        uuid.New().String(),
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-		Addr:      srv.URL,
-		Name:      "test-p2p-peer",
+	target := New(Options{
+		Addr: srv.URL,
+		Name: "target-p2p",
 	})
 
 	var called bool
-	p2p.Handle(HandlerFunc(func(ctx context.Context, m *Message) (any, error) {
+	target.Handle(HandlerFunc(func(ctx context.Context, m *Message) (any, error) {
 		called = true
-		log.Println("message received", m)
+		t.Log("message received", m)
 		return "received", nil
 	}))
 
-	data, err := p2p.Request("test-p2p-peer", "message", "Hello World")
+	HttpAPIHandle(target, mx)
+	p2p.register(target.current)
+
+	t.Logf("current client signature: '%s'", p2p.signature(p2p.current))
+	t.Logf("target client %s: %s, signature: '%s'", target.current.Name, target.current.Addr, target.signature(target.current))
+
+	data, err := p2p.Request("target-p2p", "message", "Hello World")
 	if err != nil {
 		t.Fatalf("failed at broadcast: %s", err)
 	}
@@ -76,5 +71,5 @@ func TestP2P_Request(t *testing.T) {
 		t.Error("custom handler was no called")
 	}
 
-	log.Println("data received:", string(data))
+	t.Log("data received:", string(data))
 }
