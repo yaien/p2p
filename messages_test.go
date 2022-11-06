@@ -71,5 +71,5 @@ func TestP2P_Request(t *testing.T) {
 		t.Error("custom handler was no called")
 	}
 
-	t.Log("data received:", string(data))
+	t.Log("data received:", data)
 }

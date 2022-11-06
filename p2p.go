@@ -76,11 +76,13 @@ func (p *P2P) CurrentAddr() string {
 }
 
 func (p *P2P) SetCurrentAddr(addr string) {
-	p.mutex.Lock()
-	defer p.mutex.Unlock()
 	p.current.Addr = addr
 	p.current.UpdatedAt = time.Now()
 	p.current.RefresedAt = time.Now()
+}
+
+func (p *P2P) Handle(h Handler) {
+	p.handler = h
 }
 
 func (p *P2P) Channel() <-chan *State {

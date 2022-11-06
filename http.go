@@ -21,7 +21,7 @@ func HttpUIHandle(p2p *P2P, mx *http.ServeMux) {
 
 	mx.Handle("/p2p/", http.StripPrefix("/p2p/", http.FileServer(http.FS(site.FS))))
 
-	mx.Handle("/p2p/sse", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mx.HandleFunc("/p2p/sse", func(w http.ResponseWriter, r *http.Request) {
 
 		h := w.Header()
 		h.Set("Content-Type", "text/event-stream")
@@ -46,19 +46,19 @@ func HttpUIHandle(p2p *P2P, mx *http.ServeMux) {
 			f.Flush()
 		}
 
-	}))
+	})
 }
 
 // HttpAPIHandle set the p2p connection endpoints
 func HttpAPIHandle(p2p *P2P, mx *http.ServeMux) {
 
-	mx.Handle("/api/state", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mx.HandleFunc("/api/state", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(p2p.State())
-	}))
+	})
 
-	mx.Handle("/api/connect", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mx.HandleFunc("/api/connect", func(w http.ResponseWriter, r *http.Request) {
 
 		var cl Client
 		err := json.NewDecoder(r.Body).Decode(&cl)
@@ -82,9 +82,9 @@ func HttpAPIHandle(p2p *P2P, mx *http.ServeMux) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(p2p.State())
-	}))
+	})
 
-	mx.Handle("/api/handle", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mx.HandleFunc("/api/handle", func(w http.ResponseWriter, r *http.Request) {
 
 		w.Header().Set("content-type", "application/json")
 
@@ -102,7 +102,7 @@ func HttpAPIHandle(p2p *P2P, mx *http.ServeMux) {
 			return
 		}
 
-		data, err := p2p.handler.Handle(r.Context(), &message)
+		data, err := p2p.handler.ServeP2P(r.Context(), &message)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			json.NewEncoder(w).Encode(map[string]any{"error": err.Error()})
@@ -112,5 +112,5 @@ func HttpAPIHandle(p2p *P2P, mx *http.ServeMux) {
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(reply{Data: data})
 
-	}))
+	})
 }

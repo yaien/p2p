@@ -2,7 +2,6 @@ package p2p
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -21,25 +20,6 @@ type Message struct {
 type reply struct {
 	Data  any    `json:"data"`
 	Error string `json:"error"`
-}
-
-type Handler interface {
-	Handle(ctx context.Context, m *Message) (data any, err error)
-}
-
-type HandlerFunc func(ctx context.Context, m *Message) (any, error)
-
-func (h HandlerFunc) Handle(ctx context.Context, m *Message) (any, error) {
-	return h(ctx, m)
-}
-
-var DefaultHandler = HandlerFunc(func(ctx context.Context, m *Message) (any, error) {
-	data := map[string]any{"status": "received", "subject": m.Subject, "sender": m.From, "body": m.Body}
-	return data, nil
-})
-
-func (p *P2P) Handle(h Handler) {
-	p.handler = h
 }
 
 func (p *P2P) Broadcast(pattern string, subj string, body any) error {
@@ -75,7 +55,7 @@ func (p *P2P) Broadcast(pattern string, subj string, body any) error {
 	return nil
 }
 
-func (p *P2P) Request(pattern string, subj string, body any) (data []byte, err error) {
+func (p *P2P) Request(pattern string, subj string, body any) (data any, err error) {
 
 	message := &Message{From: p.current, Subject: subj, Body: body}
 	b, err := json.Marshal(message)
@@ -117,7 +97,7 @@ func (p *P2P) Request(pattern string, subj string, body any) (data []byte, err e
 			return nil, fmt.Errorf("request failed with status %d: %s", res.StatusCode, r.Error)
 		}
 
-		return json.Marshal(r.Data)
+		return r.Data, nil
 	}
 
 	return nil, fmt.Errorf("%w %s", ErrNoneMatchedPeers, pattern)
