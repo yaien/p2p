@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"regexp"
+	"path"
 )
 
 var ErrNoneMatchedPeers = errors.New("none peer matched the pattern")
@@ -16,6 +16,11 @@ type Message struct {
 	From    *Client `json:"from"`
 	Subject string  `json:"string"`
 	Body    any     `json:"body"`
+}
+
+type reply struct {
+	Data  any    `json:"data"`
+	Error string `json:"error"`
 }
 
 type Handler interface {
@@ -38,10 +43,6 @@ func (p *P2P) Handle(h Handler) {
 }
 
 func (p *P2P) Broadcast(pattern string, subj string, body any) error {
-	regex, err := regexp.Compile(pattern)
-	if err != nil {
-		return fmt.Errorf("invalid pattern: %w", err)
-	}
 
 	message := &Message{From: p.current, Subject: subj, Body: body}
 	b, err := json.Marshal(message)
@@ -50,7 +51,12 @@ func (p *P2P) Broadcast(pattern string, subj string, body any) error {
 	}
 
 	for _, c := range p.clients {
-		if !regex.MatchString(c.Name) {
+		matched, err := path.Match(pattern, c.Name)
+		if err != nil {
+			return fmt.Errorf("failed at pattern match: %w", err)
+		}
+
+		if !matched {
 			continue
 		}
 
@@ -69,11 +75,7 @@ func (p *P2P) Broadcast(pattern string, subj string, body any) error {
 	return nil
 }
 
-func (p *P2P) Request(pattern string, subj string, body any) (*http.Response, error) {
-	regex, err := regexp.Compile(pattern)
-	if err != nil {
-		return nil, fmt.Errorf("invalid pattern: %w", err)
-	}
+func (p *P2P) Request(pattern string, subj string, body any) (data []byte, err error) {
 
 	message := &Message{From: p.current, Subject: subj, Body: body}
 	b, err := json.Marshal(message)
@@ -82,7 +84,12 @@ func (p *P2P) Request(pattern string, subj string, body any) (*http.Response, er
 	}
 
 	for _, c := range p.clients {
-		if !regex.MatchString(c.Name) {
+		matched, err := path.Match(pattern, c.Name)
+		if err != nil {
+			return nil, fmt.Errorf("failed at pattern match: %w", err)
+		}
+
+		if !matched {
 			continue
 		}
 
@@ -95,7 +102,22 @@ func (p *P2P) Request(pattern string, subj string, body any) (*http.Response, er
 		req.Header.Set("X-Signature", p.signature(p.current))
 
 		var h http.Client
-		return h.Do(req)
+		res, err := h.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("failed doing request: %w", err)
+		}
+
+		var r reply
+		err = json.NewDecoder(res.Body).Decode(&r)
+		if err != nil {
+			return nil, fmt.Errorf("failed at decoding response: %w", err)
+		}
+
+		if res.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("request failed with status %d: %s", res.StatusCode, r.Error)
+		}
+
+		return json.Marshal(r.Data)
 	}
 
 	return nil, fmt.Errorf("%w %s", ErrNoneMatchedPeers, pattern)

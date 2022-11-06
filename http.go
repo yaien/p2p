@@ -110,7 +110,7 @@ func HttpAPIHandle(p2p *P2P, mx *http.ServeMux) {
 		}
 
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]any{"data": data})
+		json.NewEncoder(w).Encode(reply{Data: data})
 
 	}))
 }
