@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>P2P</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-Zenh87qX5JnK2Jl0vWa8Ck2rdkQ2Bzep5IDxbcnCeuOxjzrPF/et3URy9Bv1WTRi"
+      crossorigin="anonymous"
+    />
+    <link rel="stylesheet" href="index.css" />
+  </head>
+
+  <body>
+    <main id="app" class="container-md" :class="classes.main">
+      <ul class="list-group" v-if="current">
+        <li class="list-group-item d-flex justify-content-between align-items-center" :class="classes.item">
+          <div class="ms-2 me-auto">
+            <div class="fw-bold">{{current.name}}</div>
+            <div class="fs-6">
+              <a :href="current.addr" target="_blank">{{ current.addr }}</a>
+            </div>
+            <div class="fs-6 text-muted">
+              <date-since :date="current.updatedAt"></date-since>
+            </div>
+          </div>
+          <span class="badge bg-primary rounded-pill">current</span>
+        </li>
+        <li v-for="client in clients" :key="client.id" class="list-group-item" :class="classes.item">
+          <div class="ms-2 me-auto">
+            <div class="fw-bold">{{client.name}}</div>
+            <div class="fs-6">
+              <a :href="client.addr" target="_blank"> {{client.addr}} </a>
+            </div>
+            <div class="fs-6 text-muted">
+              <date-since :date="client.updatedAt"></date-since>
+            </div>
+          </div>
+        </li>
+      </ul>
+    </main>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
+    <script src="https://unpkg.com/vue@3"></script>
+    <script src="index.js"></script>
+  </body>
+</html>
