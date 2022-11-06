@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -36,8 +37,13 @@ func root() *cobra.Command {
 		Use: "p2p",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
+			l, err := net.Listen("tcp", fmt.Sprintf(":%d", viper.GetInt("port")))
+			if err != nil {
+				return fmt.Errorf("failed at listen: %w", err)
+			}
+
 			p := p2p.New(p2p.Options{
-				Addr:   fmt.Sprintf(":%d", viper.GetInt("port")),
+				Addr:   "http://" + l.Addr().String(),
 				Name:   viper.GetString("name"),
 				Key:    viper.GetString("key"),
 				Lookup: viper.GetStringSlice("lookup"),
@@ -46,7 +52,7 @@ func root() *cobra.Command {
 			if viper.GetBool("ngrok") {
 				ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
 				defer cancel()
-				tnl, err := ngrok.Open(ctx, ngrok.Options{Addr: p.Addr(), AuthToken: viper.GetString("ngrok-authtoken")})
+				tnl, err := ngrok.Open(ctx, ngrok.Options{Addr: l.Addr().String(), AuthToken: viper.GetString("ngrok-authtoken")})
 				if err != nil {
 					log.Fatal(err)
 				}
@@ -59,7 +65,7 @@ func root() *cobra.Command {
 			go func() {
 				log.Println("server listening on", p.Addr())
 				p2p.HttpHandle(p, http.DefaultServeMux)
-				err := http.ListenAndServe(p.Addr(), nil)
+				err := http.Serve(l, nil)
 				if err != nil {
 					log.Fatalf("failed initializing server: %s", err)
 				}
