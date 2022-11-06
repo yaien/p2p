@@ -43,7 +43,7 @@ func (p *P2P) Broadcast(pattern string, subj string, body any) error {
 		return fmt.Errorf("invalid pattern: %w", err)
 	}
 
-	message := &Message{From: p.current, Body: body}
+	message := &Message{From: p.current, Subject: subj, Body: body}
 	b, err := json.Marshal(message)
 	if err != nil {
 		return fmt.Errorf("failed marshall: %w", err)
@@ -69,13 +69,13 @@ func (p *P2P) Broadcast(pattern string, subj string, body any) error {
 	return nil
 }
 
-func (p *P2P) Request(pattern string, body any) (*http.Response, error) {
+func (p *P2P) Request(pattern string, subj string, body any) (*http.Response, error) {
 	regex, err := regexp.Compile(pattern)
 	if err != nil {
 		return nil, fmt.Errorf("invalid pattern: %w", err)
 	}
 
-	message := &Message{From: p.current, Body: body}
+	message := &Message{From: p.current, Subject: subj, Body: body}
 	b, err := json.Marshal(message)
 	if err != nil {
 		return nil, fmt.Errorf("failed marshall: %w", err)
