@@ -19,7 +19,8 @@ import (
 
 func init() {
 	config, _ := os.UserConfigDir()
-	viper.SetConfigFile("p2p.config.yaml")
+	viper.SetConfigName("config")
+	viper.SetConfigType("yaml")
 	viper.AddConfigPath(filepath.Join(config, "p2p"))
 	viper.AddConfigPath("$HOME/.p2p")
 	viper.AddConfigPath(".")
