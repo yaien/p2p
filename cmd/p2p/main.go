@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/yaien/ngrok"
@@ -29,6 +30,7 @@ func init() {
 
 func main() {
 	cmd := root()
+	cmd.AddCommand(monitor())
 	cmd.Execute()
 }
 
@@ -91,4 +93,17 @@ func root() *cobra.Command {
 	viper.BindPFlags(flags)
 
 	return cmd
+}
+
+func monitor() *cobra.Command {
+	return &cobra.Command{
+		Use:  "monitor [addr]",
+		Args: cobra.ExactArgs(1),
+		Run: func(cmd *cobra.Command, args []string) {
+			monitor := p2p.NewMonitor(args[0])
+			monitor.SetContext(cmd.Context())
+			program := tea.NewProgram(monitor, tea.WithContext(cmd.Context()))
+			program.Run()
+		},
+	}
 }
