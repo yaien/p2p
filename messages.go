@@ -97,6 +97,10 @@ func (p *P2P) Request(pattern string, subj string, body any) (data any, err erro
 			return nil, fmt.Errorf("request failed with status %d: %s", res.StatusCode, r.Error)
 		}
 
+		if r.Error != "" {
+			return nil, fmt.Errorf("reply error: %s", r.Error)
+		}
+
 		return r.Data, nil
 	}
 

@@ -42,5 +42,5 @@ func (mx *ServeMux) ServeP2P(ctx context.Context, m *Message) (any, error) {
 		return h.ServeP2P(ctx, m)
 	}
 
-	return nil, fmt.Errorf("unregistred handler for subject '%s'", m.Subject)
+	return nil, fmt.Errorf("unregistered handler for subject '%s'", m.Subject)
 }
