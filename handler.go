@@ -6,19 +6,14 @@ import (
 )
 
 type Handler interface {
-	ServeP2P(ctx context.Context, m *Message) (data any, err error)
+	ServeP2P(ctx context.Context, r *MessageRequest) (data []byte, err error)
 }
 
-type HandlerFunc func(ctx context.Context, m *Message) (any, error)
+type HandlerFunc func(ctx context.Context, r *MessageRequest) ([]byte, error)
 
-func (h HandlerFunc) ServeP2P(ctx context.Context, m *Message) (any, error) {
-	return h(ctx, m)
+func (h HandlerFunc) ServeP2P(ctx context.Context, r *MessageRequest) ([]byte, error) {
+	return h(ctx, r)
 }
-
-var DefaultHandler = HandlerFunc(func(ctx context.Context, m *Message) (any, error) {
-	data := map[string]any{"status": "received", "subject": m.Subject, "sender": m.From, "body": m.Body}
-	return data, nil
-})
 
 type ServeMux struct {
 	handlers map[string]Handler
@@ -32,11 +27,11 @@ func (mx *ServeMux) Handle(subject string, handler Handler) {
 	mx.handlers[subject] = handler
 }
 
-func (mx *ServeMux) HandleFunc(subject string, handler func(context.Context, *Message) (any, error)) {
+func (mx *ServeMux) HandleFunc(subject string, handler func(context.Context, *MessageRequest) ([]byte, error)) {
 	mx.Handle(subject, HandlerFunc(handler))
 }
 
-func (mx *ServeMux) ServeP2P(ctx context.Context, m *Message) (any, error) {
+func (mx *ServeMux) ServeP2P(ctx context.Context, m *MessageRequest) ([]byte, error) {
 	h, ok := mx.handlers[m.Subject]
 	if ok {
 		return h.ServeP2P(ctx, m)

@@ -48,7 +48,6 @@ func root() *cobra.Command {
 			p := p2p.New(p2p.Options{
 				Addr:   "http://" + l.Addr().String(),
 				Name:   viper.GetString("name"),
-				Key:    viper.GetString("key"),
 				Lookup: viper.GetStringSlice("lookup"),
 			})
 

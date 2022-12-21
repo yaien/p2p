@@ -8,16 +8,31 @@ import (
 	"github.com/yaien/p2p/site"
 )
 
+type HttpServer struct {
+	p2p        *P2P
+	subscriber *Subscriber
+	key        string
+}
+
+func NewHttpServer(p *P2P, s *Subscriber, key string) *HttpServer {
+	return &HttpServer{p, s, key}
+}
+
+func (s *HttpServer) Serve(addr string) error {
+	handler := http.NewServeMux()
+	s.Register(handler)
+	server := &http.Server{Handler: handler, Addr: addr}
+	return server.ListenAndServe()
+}
+
 // HttpHandler combine the ui handler and the connect handler
-func HttpHandle(p2p *P2P, mx *http.ServeMux) {
-	HttpUIHandle(p2p, mx)
-	HttpAPIHandle(p2p, mx)
+func (s *HttpServer) Register(mx *http.ServeMux) {
+	s.RegisterUI(mx)
+	s.RegisterAPI(mx)
 }
 
 // HttpUIHandle the p2p2 real time user interface handler
-func HttpUIHandle(p2p *P2P, mx *http.ServeMux) {
-
-	sb := NewSubscriber(p2p.Channel())
+func (s *HttpServer) RegisterUI(mx *http.ServeMux) {
 
 	mx.Handle("/p2p/", http.StripPrefix("/p2p/", http.FileServer(http.FS(site.FS))))
 
@@ -34,8 +49,8 @@ func HttpUIHandle(p2p *P2P, mx *http.ServeMux) {
 
 		f := w.(http.Flusher)
 
-		updated, unsub := sb.Subscribe()
-		defer unsub()
+		updated, unsubscribe := s.subscriber.Subscribe()
+		defer unsubscribe()
 
 		for state := range updated {
 			msg, _ := json.Marshal(state)
@@ -50,59 +65,56 @@ func HttpUIHandle(p2p *P2P, mx *http.ServeMux) {
 }
 
 // HttpAPIHandle set the p2p connection endpoints
-func HttpAPIHandle(p2p *P2P, mx *http.ServeMux) {
+func (s *HttpServer) RegisterAPI(mx *http.ServeMux) {
 
 	mx.HandleFunc("/api/state", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(p2p.State())
+		json.NewEncoder(w).Encode(s.p2p.State())
 	})
 
 	mx.HandleFunc("/api/connect", func(w http.ResponseWriter, r *http.Request) {
 
-		var cl Client
-		err := json.NewDecoder(r.Body).Decode(&cl)
+		w.Header().Set("Content-Type", "application/json")
+
+		var peer Peer
+		err := json.NewDecoder(r.Body).Decode(&peer)
 		if err != nil {
-			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusBadRequest)
 			json.NewEncoder(w).Encode(map[string]any{"error": err.Error()})
 			return
 		}
 
-		signature := r.Header.Get("X-Signature")
-
-		err = p2p.Save(signature, &cl)
-		if err != nil {
-			w.Header().Set("Content-Type", "application/json")
+		if r.Header.Get("X-Signature") != signature(&peer, s.key) {
 			w.WriteHeader(http.StatusUnauthorized)
-			json.NewEncoder(w).Encode(map[string]any{"error": err.Error()})
+			json.NewEncoder(w).Encode(map[string]any{"error": "invalid signature"})
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
+		s.p2p.Save(&peer)
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(p2p.State())
+		json.NewEncoder(w).Encode(s.p2p.State())
 	})
 
 	mx.HandleFunc("/api/handle", func(w http.ResponseWriter, r *http.Request) {
 
 		w.Header().Set("content-type", "application/json")
 
-		var message Message
-		err := json.NewDecoder(r.Body).Decode(&message)
+		var req HttpMessage
+		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			json.NewEncoder(w).Encode(map[string]any{"error": err.Error()})
 			return
 		}
 
-		if r.Header.Get("X-Signature") != p2p.signature(message.From) {
+		if r.Header.Get("X-Signature") != signature(req.From, s.key) {
 			w.WriteHeader(http.StatusUnauthorized)
 			json.NewEncoder(w).Encode(map[string]any{"error": "invalid signature"})
 			return
 		}
 
-		data, err := p2p.handler.ServeP2P(r.Context(), &message)
+		body, err := s.p2p.handler.ServeP2P(r.Context(), &MessageRequest{From: req.From, Subject: req.Subject, Body: req.Body})
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			json.NewEncoder(w).Encode(map[string]any{"error": err.Error()})
@@ -110,7 +122,6 @@ func HttpAPIHandle(p2p *P2P, mx *http.ServeMux) {
 		}
 
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(reply{Data: data})
-
+		json.NewEncoder(w).Encode(&HttpMessageReply{Body: body})
 	})
 }

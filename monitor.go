@@ -65,15 +65,18 @@ func (m *Monitor) View() string {
 
 	fmt.Fprintln(wr, "Addr\tName\tSince\tCurrent")
 
-	curr := m.state.Current
-	if curr != nil {
-		since := time.Since(curr.UpdatedAt).Truncate(time.Second)
-		fmt.Fprintf(wr, "%s\t%s\t%s\t%s\n", curr.Addr, curr.Name, since, "*")
+	current := m.state.Current
+
+	if current != nil {
+		t, _ := time.Parse(time.RFC3339, current.UpdatedAt)
+		since := time.Since(t).Truncate(time.Second)
+		fmt.Fprintf(wr, "%s\t%s\t%s\t%s\n", current.Addr, current.Name, since, "*")
 	}
 
-	for _, cl := range m.state.Clients {
-		since := time.Since(cl.UpdatedAt).Truncate(time.Second)
-		fmt.Fprintf(wr, "%s\t%s\t%s\t%s\n", cl.Addr, cl.Name, since, "")
+	for _, peer := range m.state.Peers {
+		t, _ := time.Parse(time.RFC3339, current.UpdatedAt)
+		since := time.Since(t).Truncate(time.Second)
+		fmt.Fprintf(wr, "%s\t%s\t%s\t%s\n", peer.Addr, peer.Name, since, "")
 	}
 
 	wr.Flush()

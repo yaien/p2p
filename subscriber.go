@@ -3,8 +3,8 @@ package p2p
 import "sync"
 
 type Subscriber struct {
-	source <-chan *State
-	subs   sync.Map
+	source        <-chan *State
+	subscriptions sync.Map
 }
 
 func NewSubscriber(source <-chan *State) *Subscriber {
@@ -13,20 +13,20 @@ func NewSubscriber(source <-chan *State) *Subscriber {
 	return s
 }
 
-func (s *Subscriber) Subscribe() (clients <-chan *State, unsub func()) {
-	ch := make(chan *State)
-	s.subs.Store(ch, true)
-	unsub = func() {
-		s.subs.Delete(ch)
+func (s *Subscriber) Subscribe() (ch <-chan *State, unsubscribe func()) {
+	ch = make(chan *State)
+	s.subscriptions.Store(ch, true)
+	unsubscribe = func() {
+		s.subscriptions.Delete(ch)
 	}
-	return ch, unsub
+	return ch, unsubscribe
 }
 
 func (s *Subscriber) start() {
 	for state := range s.source {
-		s.subs.Range(func(key, _ any) bool {
-			ch := key.(chan *State)
-			ch <- state
+		s.subscriptions.Range(func(key, _ any) bool {
+			subscription := key.(chan *State)
+			subscription <- state
 			return true
 		})
 	}
