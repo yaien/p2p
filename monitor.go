@@ -1,12 +1,8 @@
 package p2p
 
 import (
-	"bufio"
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"net/http"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -14,19 +10,23 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+type MonitorSubscribeFunc func(ctx context.Context, addr string, out chan<- *State) error
+
 type Monitor struct {
-	ctx     context.Context
-	addr    string
-	state   State
-	err     error
-	updates chan State
+	ctx       context.Context
+	addr      string
+	state     *State
+	err       error
+	updates   chan *State
+	subscribe MonitorSubscribeFunc
 }
 
-func NewMonitor(addr string) *Monitor {
+func NewMonitor(addr string, subscribe MonitorSubscribeFunc) *Monitor {
 	return &Monitor{
-		ctx:     context.Background(),
-		addr:    addr,
-		updates: make(chan State, 10),
+		ctx:       context.Background(),
+		addr:      addr,
+		updates:   make(chan *State, 10),
+		subscribe: subscribe,
 	}
 }
 
@@ -39,12 +39,12 @@ func (m *Monitor) Error() error {
 }
 
 func (m *Monitor) Init() tea.Cmd {
-	return tea.Batch(tea.Sequence(m.fetch, m.start), m.listen, m.refresh)
+	return tea.Batch(m.start, m.listen, m.refresh)
 }
 
 func (m *Monitor) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case State:
+	case *State:
 		m.state = msg
 		return m, m.listen
 	case tea.KeyMsg:
@@ -59,6 +59,10 @@ func (m *Monitor) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Monitor) View() string {
+	if m.state == nil {
+		return ""
+	}
+
 	var sb strings.Builder
 
 	wr := tabwriter.NewWriter(&sb, 6, 2, 2, ' ', tabwriter.Debug)
@@ -87,7 +91,7 @@ func (m *Monitor) View() string {
 func (m *Monitor) start() tea.Msg {
 	done := make(chan error, 1)
 	go func() {
-		done <- m.sse()
+		done <- m.subscribe(m.ctx, m.addr, m.updates)
 	}()
 
 	select {
@@ -98,62 +102,6 @@ func (m *Monitor) start() tea.Msg {
 	}
 
 	return tea.Quit()
-}
-
-func (m *Monitor) sse() error {
-	req, err := http.NewRequestWithContext(m.ctx, "GET", m.addr+"/p2p/sse", nil)
-	if err != nil {
-		return fmt.Errorf("failed making sse request: %w", err)
-	}
-
-	req.Header.Set("accept", "text/event-stream")
-	req.Header.Set("connection", "keep-alive")
-	req.Header.Set("Cache-Control", "no-cache")
-
-	var h http.Client
-	res, err := h.Do(req)
-	if err != nil {
-		return fmt.Errorf("failed doing sse request: %w", err)
-	}
-
-	defer res.Body.Close()
-
-	sc := bufio.NewScanner(res.Body)
-	prefix := []byte("data: ")
-	for sc.Scan() {
-		b := sc.Bytes()
-		if !bytes.HasPrefix(b, prefix) {
-			continue
-		}
-
-		b = bytes.TrimPrefix(b, prefix)
-		var state State
-		err = json.Unmarshal(b, &state)
-		if err != nil {
-			return fmt.Errorf("failed at unmarshalling state update from sse: %w", err)
-
-		}
-		m.updates <- state
-	}
-
-	return nil
-}
-
-func (m *Monitor) fetch() tea.Msg {
-	res, err := http.Get(m.addr + "/api/state")
-	if err != nil {
-		m.err = fmt.Errorf("failed getting api state: %w", err)
-		return tea.Quit()
-	}
-
-	var state State
-	err = json.NewDecoder(res.Body).Decode(&state)
-	if err != nil {
-		m.err = fmt.Errorf("failed at decoding state: %w", err)
-		return tea.Quit()
-	}
-
-	return state
 }
 
 func (m *Monitor) listen() tea.Msg {

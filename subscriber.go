@@ -7,19 +7,21 @@ type Subscriber struct {
 	subscriptions sync.Map
 }
 
+type UnsubscribeFunc func()
+
 func NewSubscriber(source <-chan *State) *Subscriber {
 	s := &Subscriber{source: source}
 	go s.start()
 	return s
 }
 
-func (s *Subscriber) Subscribe() (ch <-chan *State, unsubscribe func()) {
-	ch = make(chan *State)
-	s.subscriptions.Store(ch, true)
-	unsubscribe = func() {
-		s.subscriptions.Delete(ch)
+func (s *Subscriber) Subscribe() (<-chan *State, UnsubscribeFunc) {
+	channel := make(chan *State)
+	s.subscriptions.Store(channel, true)
+	unsubscribe := func() {
+		s.subscriptions.Delete(channel)
 	}
-	return ch, unsubscribe
+	return channel, unsubscribe
 }
 
 func (s *Subscriber) start() {

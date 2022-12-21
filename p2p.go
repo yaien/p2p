@@ -77,6 +77,10 @@ func (p *P2P) SetCurrentAddr(addr string) {
 	p.current.RefreshedAt = time.Now().Format(time.RFC3339)
 }
 
+func (p *P2P) SetNetwork(n Network) {
+	p.network = n
+}
+
 func (p *P2P) Handle(h Handler) {
 	p.handler = h
 }
@@ -121,16 +125,18 @@ func (p *P2P) scan() {
 			err := p.Discover(addr)
 			if err != nil {
 				log.Printf("failed lookup %s\n", err)
+				continue
 			}
+
 			log.Println("connected to", addr)
 		}
 	}
 
-	for addr, client := range p.peers {
+	for id, client := range p.peers {
 		err := p.Discover(client.Addr)
 		if err != nil {
 			p.mutex.Lock()
-			delete(p.peers, addr)
+			delete(p.peers, id)
 			p.mutex.Unlock()
 			log.Println("client disconnected", client.Addr, err)
 			continue
@@ -144,12 +150,12 @@ func (p *P2P) register(peer *Peer) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
-	if p.current.Addr == peer.Addr {
+	if p.current.Id == peer.Id {
 		return
 	}
 
 	peer.RefreshedAt = time.Now().Format(time.RFC3339)
-	p.peers[peer.Addr] = peer
+	p.peers[peer.Id] = peer
 }
 
 func (p *P2P) Discover(target string) error {

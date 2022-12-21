@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-
-	"github.com/yaien/p2p/site"
 )
 
 type HttpServer struct {
@@ -23,19 +21,10 @@ func NewHttpServer(p *P2P, s *Subscriber, key string) *HttpServer {
 	return h
 }
 
-// HttpHandler combine the ui handler and the connect handler
+// HttpAPIHandle set the p2p connection endpoints
 func (s *HttpServer) Register(mx *http.ServeMux) {
-	s.RegisterUI(mx)
-	s.RegisterAPI(mx)
-}
 
-// HttpUIHandle the p2p2 real time user interface handler
-func (s *HttpServer) RegisterUI(mx *http.ServeMux) {
-
-	mx.Handle("/p2p/", http.StripPrefix("/p2p/", http.FileServer(http.FS(site.FS))))
-
-	mx.HandleFunc("/p2p/sse", func(w http.ResponseWriter, r *http.Request) {
-
+	mx.HandleFunc("/api/state", func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
 		h.Set("Content-Type", "text/event-stream")
 		h.Set("Cache-Control", "no-cache")
@@ -50,6 +39,10 @@ func (s *HttpServer) RegisterUI(mx *http.ServeMux) {
 		updated, unsubscribe := s.subscriber.Subscribe()
 		defer unsubscribe()
 
+		msg, _ := json.Marshal(s.p2p.State())
+		fmt.Fprintf(w, "data: %s\n\n", string(msg))
+		f.Flush()
+
 		for state := range updated {
 			msg, _ := json.Marshal(state)
 			_, err := fmt.Fprintf(w, "data: %s\n\n", string(msg))
@@ -58,17 +51,6 @@ func (s *HttpServer) RegisterUI(mx *http.ServeMux) {
 			}
 			f.Flush()
 		}
-
-	})
-}
-
-// HttpAPIHandle set the p2p connection endpoints
-func (s *HttpServer) RegisterAPI(mx *http.ServeMux) {
-
-	mx.HandleFunc("/api/state", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(s.p2p.State())
 	})
 
 	mx.HandleFunc("/api/connect", func(w http.ResponseWriter, r *http.Request) {

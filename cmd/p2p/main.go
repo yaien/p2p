@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -21,9 +22,10 @@ func init() {
 	config, _ := os.UserConfigDir()
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
-	viper.AddConfigPath(filepath.Join(config, "p2p"))
-	viper.AddConfigPath("$HOME/.p2p")
+	viper.SetDefault("network", "rest")
 	viper.AddConfigPath(".")
+	viper.AddConfigPath("$HOME/.p2p")
+	viper.AddConfigPath(filepath.Join(config, "p2p"))
 	viper.ReadInConfig()
 }
 
@@ -45,23 +47,11 @@ func root() *cobra.Command {
 			}
 
 			p := p2p.New(p2p.Options{
-				Addr:   "http://" + l.Addr().String(),
-				Name:   viper.GetString("name"),
-				Lookup: viper.GetStringSlice("lookup"),
+				Addr:    "http://" + l.Addr().String(),
+				Name:    viper.GetString("name"),
+				Lookup:  viper.GetStringSlice("lookup"),
+				Network: &p2p.HttpNetwork{Key: viper.GetString("key")},
 			})
-
-			if viper.GetBool("ngrok") {
-				ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
-				defer cancel()
-				tnl, err := ngrok.Open(ctx, ngrok.Options{Addr: l.Addr().String(), AuthToken: viper.GetString("ngrok-authtoken")})
-				if err != nil {
-					log.Fatal(err)
-				}
-				p.SetCurrentAddr(tnl.Url())
-				log.Println("ngrok tunnel listening on", tnl.Url())
-				log.Println("ngrok agent listening on", tnl.AgentUrl())
-				defer tnl.Close()
-			}
 
 			if viper.Get("network") == "rest" {
 				go func() {
@@ -78,7 +68,9 @@ func root() *cobra.Command {
 
 			if viper.Get("network") == "grpc" {
 				go func() {
-					log.Println("grpc server listening on", p.Addr())
+					p.SetNetwork(&p2p.GrpcNetwork{})
+					p.SetCurrentAddr(l.Addr().String())
+					log.Println("grpc server listening on", p.CurrentAddr())
 					sub := p2p.NewSubscriber(p.Channel())
 					srv := p2p.NewGrpcServer(p, sub)
 					err = srv.Serve(l)
@@ -86,6 +78,23 @@ func root() *cobra.Command {
 						log.Fatalf("failed initializing server: %s", err)
 					}
 				}()
+			}
+
+			if viper.GetBool("ngrok") {
+				ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
+				defer cancel()
+				tnl, err := ngrok.Open(ctx, ngrok.Options{Addr: l.Addr().String(), AuthToken: viper.GetString("ngrok-authtoken")})
+				if err != nil {
+					log.Fatal(err)
+				}
+				url := tnl.Url()
+				if viper.GetString("network") == "grpc" {
+					url = strings.TrimPrefix(url, "https://")
+				}
+				p.SetCurrentAddr(url)
+				log.Println("ngrok tunnel listening on", tnl.Url())
+				log.Println("ngrok agent listening on", tnl.AgentUrl())
+				defer tnl.Close()
 			}
 
 			go p.Start()
@@ -111,14 +120,22 @@ func root() *cobra.Command {
 }
 
 func monitor() *cobra.Command {
-	return &cobra.Command{
+	var network string
+	cmd := &cobra.Command{
 		Use:  "monitor [addr]",
 		Args: cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			monitor := p2p.NewMonitor(args[0])
+			subscribe := p2p.Subscribe2Http
+			if network == "grpc" {
+				subscribe = p2p.Subscribe2Grpc
+			}
+			monitor := p2p.NewMonitor(args[0], subscribe)
 			monitor.SetContext(cmd.Context())
 			program := tea.NewProgram(monitor, tea.WithContext(cmd.Context()))
 			program.Run()
 		},
 	}
+
+	cmd.Flags().StringVarP(&network, "network", "n", "rest", "--use n [rest|grpc] to specify the target monitor transport network")
+	return cmd
 }
