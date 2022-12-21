@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -64,14 +63,30 @@ func root() *cobra.Command {
 				defer tnl.Close()
 			}
 
-			go func() {
-				log.Println("server listening on", p.Addr())
-				p2p.HttpHandle(p, http.DefaultServeMux)
-				err := http.Serve(l, nil)
-				if err != nil {
-					log.Fatalf("failed initializing server: %s", err)
-				}
-			}()
+			if viper.Get("network") == "rest" {
+				go func() {
+					log.Println("rest server listening on", p.Addr())
+					key := viper.GetString("key")
+					sub := p2p.NewSubscriber(p.Channel())
+					srv := p2p.NewHttpServer(p, sub, key)
+					err = srv.Serve(l)
+					if err != nil {
+						log.Fatalf("failed initializing server: %s", err)
+					}
+				}()
+			}
+
+			if viper.Get("network") == "grpc" {
+				go func() {
+					log.Println("grpc server listening on", p.Addr())
+					sub := p2p.NewSubscriber(p.Channel())
+					srv := p2p.NewGrpcServer(p, sub)
+					err = srv.Serve(l)
+					if err != nil {
+						log.Fatalf("failed initializing server: %s", err)
+					}
+				}()
+			}
 
 			go p.Start()
 
@@ -86,9 +101,10 @@ func root() *cobra.Command {
 	flags.IntP("port", "p", 3000, "use -p to especify the current localhost server's port")
 	flags.String("ngrok-authtoken", "", "use --ngrok-authtoken to set the ngrok auth token")
 	flags.Bool("ngrok", false, "use --ngrok to serve p2p on an ngrok tunnel")
-	flags.StringSlice("lookup", []string{}, "use --lookup to set initial adresses to be scanned")
+	flags.StringSlice("lookup", []string{}, "use --lookup to set initial addresses to be scanned")
 	flags.String("key", "", "use --key to set the p2p common's key")
 	flags.String("name", "", "use --name to set the current client's name")
+	flags.StringP("network", "n", "rest", "use -n [rest|grpc] to specify the current p2p transport network")
 	viper.BindPFlags(flags)
 
 	return cmd

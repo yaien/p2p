@@ -1,78 +1,166 @@
-package p2p
+package p2p_test
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/yaien/p2p"
+	"golang.org/x/net/nettest"
 )
 
-func TestP2P_Broadcast(t *testing.T) {
-	p2p := New(Options{Network: &HttpNetwork{}})
+func mockup(h p2p.HandlerFunc) (p2p.Handler, *bool) {
+	var called bool
+	handler := p2p.HandlerFunc(func(ctx context.Context, r *p2p.MessageRequest) ([]byte, error) {
+		called = true
+		return h.ServeP2P(ctx, r)
+	})
+	return handler, &called
+}
+
+func TestP2P_Http_Broadcast(t *testing.T) {
+	network := &p2p.HttpNetwork{}
+	from := p2p.New(p2p.Options{Network: network})
 
 	mx := http.NewServeMux()
 	srv := httptest.NewServer(mx)
 	defer srv.Close()
 
-	target := New(Options{Addr: srv.URL, Name: "target-p2p", Network: &HttpNetwork{}})
+	to := p2p.New(p2p.Options{Addr: srv.URL, Name: "target-p2p", Network: network})
+	p2p.NewHttpServer(to, nil, "").Register(mx)
 
-	var called bool
-	target.Handle(HandlerFunc(func(ctx context.Context, m *MessageRequest) ([]byte, error) {
-		called = true
+	handler, called := mockup(func(ctx context.Context, m *p2p.MessageRequest) ([]byte, error) {
 		t.Log("message received", m)
 		return []byte(`{ "message": "received" }`), nil
-	}))
+	})
 
-	h := NewHttpServer(target, nil, "")
-	h.RegisterAPI(mx)
+	to.Handle(handler)
 
-	p2p.register(target.current)
+	err := from.Discover(to.CurrentAddr())
+	if err != nil {
+		log.Fatalf("failed at discover: %s", err)
+	}
 
-	err := p2p.Broadcast("*", "message", []byte(`{ "message": "Hello World" }`))
+	err = from.Broadcast("*", "message", []byte(`{ "message": "Hello World" }`))
 	if err != nil {
 		t.Fatalf("failed at broadcast: %s", err)
 	}
 
-	if !called {
+	if !*called {
 		t.Error("custom handler was no called")
 	}
 }
 
-func TestP2P_Request(t *testing.T) {
-	p2p := New(Options{Network: &HttpNetwork{}})
+func TestP2P_Http_Request(t *testing.T) {
+	network := &p2p.HttpNetwork{}
+	from := p2p.New(p2p.Options{Network: network})
 
 	mx := http.NewServeMux()
 	srv := httptest.NewServer(mx)
 	defer srv.Close()
 
-	target := New(Options{
-		Addr:    srv.URL,
-		Name:    "target-p2p",
-		Network: &HttpNetwork{},
-	})
+	to := p2p.New(p2p.Options{Addr: srv.URL, Name: "target-p2p", Network: network})
 
-	var called bool
-	target.Handle(HandlerFunc(func(ctx context.Context, m *MessageRequest) ([]byte, error) {
-		called = true
+	handler, called := mockup(func(ctx context.Context, m *p2p.MessageRequest) ([]byte, error) {
 		t.Log("message received", m)
 		return []byte(`{ "message": "received" }`), nil
-	}))
+	})
 
-	h := NewHttpServer(target, nil, "")
-	h.RegisterAPI(mx)
-	p2p.register(target.current)
+	to.Handle(handler)
 
-	t.Logf("current client signature: '%s'", signature(p2p.current, ""))
-	t.Logf("target client %s: %s, signature: '%s'", target.current.Name, target.current.Addr, signature(target.current, ""))
+	p2p.NewHttpServer(to, nil, "").Register(mx)
 
-	data, err := p2p.Request("target-p2p", "message", []byte(`{"message": "Hello World" }`))
+	err := from.Discover(to.CurrentAddr())
+	if err != nil {
+		log.Fatalf("failed at discover: %s", err)
+	}
+
+	data, err := from.Request("target-p2p", "message", []byte(`{"message": "Hello World" }`))
 	if err != nil {
 		t.Fatalf("failed at request: %s", err)
 	}
 
-	if !called {
+	if !*called {
 		t.Error("custom handler was no called")
 	}
 
-	t.Log("data received:", data)
+	t.Log("data received:", string(data))
+}
+
+func TestP2P_Grpc_Broadcast(t *testing.T) {
+	network := &p2p.GrpcNetwork{}
+	from := p2p.New(p2p.Options{Network: network})
+
+	lis, err := nettest.NewLocalListener("tcp")
+	if err != nil {
+		t.Fatalf("failed at creating testing listener: %s", err)
+	}
+
+	to := p2p.New(p2p.Options{Addr: lis.Addr().String(), Name: "target-p2p", Network: network})
+
+	handler, called := mockup(func(ctx context.Context, m *p2p.MessageRequest) ([]byte, error) {
+		t.Log("message received", m)
+		return []byte(`{ "message": "received" }`), nil
+	})
+
+	to.Handle(handler)
+
+	srv := p2p.NewGrpcServer(to, nil)
+	go srv.Serve(lis)
+	defer srv.Close()
+
+	err = from.Discover(to.CurrentAddr())
+	if err != nil {
+		log.Fatalf("failed at discover: %s", err)
+	}
+
+	err = from.Broadcast("*", "message", []byte(`{ "message": "Hello World" }`))
+	if err != nil {
+		t.Fatalf("failed at broadcast: %s", err)
+	}
+
+	if !*called {
+		t.Error("custom handler was no called")
+	}
+}
+
+func TestP2P_Grpc_Request(t *testing.T) {
+	network := &p2p.GrpcNetwork{}
+	from := p2p.New(p2p.Options{Network: network})
+
+	lis, err := nettest.NewLocalListener("tcp")
+	if err != nil {
+		t.Fatalf("failed creating testing listener: %s", err)
+	}
+
+	to := p2p.New(p2p.Options{Addr: lis.Addr().String(), Name: "target-p2p", Network: network})
+
+	handler, called := mockup(func(ctx context.Context, m *p2p.MessageRequest) ([]byte, error) {
+		t.Log("message received", m)
+		return []byte(`{ "message": "received" }`), nil
+	})
+
+	to.Handle(handler)
+
+	srv := p2p.NewGrpcServer(to, nil)
+	go srv.Serve(lis)
+	defer srv.Close()
+
+	err = from.Discover(to.CurrentAddr())
+	if err != nil {
+		log.Fatalf("failed at discover: %s", err)
+	}
+
+	data, err := from.Request("target-p2p", "message", []byte(`{"message": "Hello World" }`))
+	if err != nil {
+		t.Fatalf("failed at request: %s", err)
+	}
+
+	if !*called {
+		t.Error("custom handler was no called")
+	}
+
+	t.Log("data received:", string(data))
 }

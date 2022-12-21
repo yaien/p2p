@@ -13,22 +13,23 @@ type GrpcServer struct {
 	UnimplementedP2PServer
 	p2p        *P2P
 	subscriber *Subscriber
+	server     *grpc.Server
 }
 
-func NewGrpcP2PServer(p2p *P2P, s *Subscriber) *GrpcServer {
+func NewGrpcServer(p2p *P2P, s *Subscriber) *GrpcServer {
 	return &GrpcServer{p2p: p2p, subscriber: s}
 }
 
-func (s *GrpcServer) Serve(addr string) error {
-	lis, err := net.Listen("tcp", addr)
-	if err != nil {
-		return fmt.Errorf("failed at listen: %w", err)
-	}
+func (s *GrpcServer) Serve(lis net.Listener) error {
+	s.server = grpc.NewServer()
+	RegisterP2PServer(s.server, s)
+	reflection.Register(s.server)
+	return s.server.Serve(lis)
+}
 
-	srv := grpc.NewServer()
-	RegisterP2PServer(srv, s)
-	reflection.Register(srv)
-	return srv.Serve(lis)
+func (s *GrpcServer) Close() error {
+	s.server.Stop()
+	return nil
 }
 
 func (s *GrpcServer) Connect(ctx context.Context, r *ConnectRequest) (*ConnectResponse, error) {

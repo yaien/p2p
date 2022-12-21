@@ -12,17 +12,15 @@ type HttpServer struct {
 	p2p        *P2P
 	subscriber *Subscriber
 	key        string
+	http.Server
 }
 
 func NewHttpServer(p *P2P, s *Subscriber, key string) *HttpServer {
-	return &HttpServer{p, s, key}
-}
-
-func (s *HttpServer) Serve(addr string) error {
+	h := &HttpServer{p2p: p, subscriber: s, key: key}
 	handler := http.NewServeMux()
-	s.Register(handler)
-	server := &http.Server{Handler: handler, Addr: addr}
-	return server.ListenAndServe()
+	h.Register(handler)
+	h.Server.Handler = handler
+	return h
 }
 
 // HttpHandler combine the ui handler and the connect handler

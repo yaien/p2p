@@ -1,8 +1,10 @@
 package p2p
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"net"
 	"sync"
 	"time"
 
@@ -12,6 +14,11 @@ import (
 type Network interface {
 	Connect(from *Peer, addr string) (*State, error)
 	Send(from, to *Peer, subject string, body []byte) ([]byte, error)
+}
+
+type Server interface {
+	Serve(l net.Listener) error
+	Close() error
 }
 
 type P2P struct {
@@ -74,6 +81,10 @@ func (p *P2P) Handle(h Handler) {
 	p.handler = h
 }
 
+func (p *P2P) HandleFunc(f func(ctx context.Context, r *MessageRequest) ([]byte, error)) {
+	p.Handle(HandlerFunc(f))
+}
+
 func (p *P2P) Channel() <-chan *State {
 	return p.channel
 }
@@ -107,7 +118,7 @@ func (p *P2P) Save(peer *Peer) {
 func (p *P2P) scan() {
 	if len(p.peers) == 0 && len(p.lookup) > 0 {
 		for _, addr := range p.lookup {
-			err := p.discover(addr)
+			err := p.Discover(addr)
 			if err != nil {
 				log.Printf("failed lookup %s\n", err)
 			}
@@ -116,7 +127,7 @@ func (p *P2P) scan() {
 	}
 
 	for addr, client := range p.peers {
-		err := p.discover(client.Addr)
+		err := p.Discover(client.Addr)
 		if err != nil {
 			p.mutex.Lock()
 			delete(p.peers, addr)
@@ -141,7 +152,7 @@ func (p *P2P) register(peer *Peer) {
 	p.peers[peer.Addr] = peer
 }
 
-func (p *P2P) discover(target string) error {
+func (p *P2P) Discover(target string) error {
 	state, err := p.network.Connect(p.current, target)
 	if err != nil {
 		return fmt.Errorf("failed at network connect: %w", err)
