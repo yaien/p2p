@@ -23,9 +23,12 @@ func init() {
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
 	viper.SetDefault("network", "rest")
+
 	viper.AddConfigPath(".")
 	viper.AddConfigPath("$HOME/.p2p")
 	viper.AddConfigPath(filepath.Join(config, "p2p"))
+	viper.SetEnvPrefix("p2p")
+	viper.AutomaticEnv()
 	viper.ReadInConfig()
 }
 
@@ -47,7 +50,7 @@ func root() *cobra.Command {
 			}
 
 			p := p2p.New(p2p.Options{
-				Addr:    "http://" + l.Addr().String(),
+				Addr:    viper.GetString("address"),
 				Name:    viper.GetString("name"),
 				Lookup:  viper.GetStringSlice("lookup"),
 				Network: &p2p.HttpNetwork{Key: viper.GetString("key")},
@@ -55,7 +58,7 @@ func root() *cobra.Command {
 
 			if viper.Get("network") == "rest" {
 				go func() {
-					log.Println("rest server listening on", p.Addr())
+					log.Println("rest server listening on", p.CurrentAddr())
 					key := viper.GetString("key")
 					sub := p2p.NewSubscriber(p.Channel())
 					srv := p2p.NewHttpServer(p, sub, key)
@@ -69,7 +72,6 @@ func root() *cobra.Command {
 			if viper.Get("network") == "grpc" {
 				go func() {
 					p.SetNetwork(&p2p.GrpcNetwork{})
-					p.SetCurrentAddr(l.Addr().String())
 					log.Println("grpc server listening on", p.CurrentAddr())
 					sub := p2p.NewSubscriber(p.Channel())
 					srv := p2p.NewGrpcServer(p, sub)
@@ -110,10 +112,11 @@ func root() *cobra.Command {
 	flags.IntP("port", "p", 3000, "use -p to especify the current localhost server's port")
 	flags.String("ngrok-authtoken", "", "use --ngrok-authtoken to set the ngrok auth token")
 	flags.Bool("ngrok", false, "use --ngrok to serve p2p on an ngrok tunnel")
-	flags.StringSlice("lookup", []string{}, "use --lookup to set initial addresses to be scanned")
+	flags.StringSliceP("lookup", "l", []string{}, "use --lookup to set initial addresses to be scanned")
 	flags.String("key", "", "use --key to set the p2p common's key")
 	flags.String("name", "", "use --name to set the current client's name")
-	flags.StringP("network", "n", "rest", "use -n [rest|grpc] to specify the current p2p transport network")
+	flags.StringP("network", "n", "rest", "use --network [rest|grpc] to specify the current p2p transport network")
+	flags.StringP("address", "a", "", "use --address to specify the current p2p address")
 	viper.BindPFlags(flags)
 
 	return cmd

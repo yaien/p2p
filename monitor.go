@@ -78,7 +78,7 @@ func (m *Monitor) View() string {
 	}
 
 	for _, peer := range m.state.Peers {
-		t, _ := time.Parse(time.RFC3339, current.UpdatedAt)
+		t, _ := time.Parse(time.RFC3339, peer.UpdatedAt)
 		since := time.Since(t).Truncate(time.Second)
 		fmt.Fprintf(wr, "%s\t%s\t%s\t%s\n", peer.Addr, peer.Name, since, "")
 	}

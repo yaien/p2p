@@ -27,7 +27,6 @@ type P2P struct {
 	peers   map[string]*Peer
 	channel chan *State
 	mutex   sync.RWMutex
-	addr    string
 	handler Handler
 	network Network
 }
@@ -51,7 +50,6 @@ func New(opts Options) *P2P {
 	}
 
 	p := &P2P{
-		addr:    opts.Addr,
 		current: current,
 		lookup:  opts.Lookup,
 		peers:   make(map[string]*Peer),
@@ -61,10 +59,6 @@ func New(opts Options) *P2P {
 	}
 
 	return p
-}
-
-func (p *P2P) Addr() string {
-	return p.addr
 }
 
 func (p *P2P) CurrentAddr() string {
