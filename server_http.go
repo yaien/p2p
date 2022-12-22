@@ -24,7 +24,7 @@ func NewHttpServer(p *P2P, s *Subscriber, key string) *HttpServer {
 // HttpAPIHandle set the p2p connection endpoints
 func (s *HttpServer) Register(mx *http.ServeMux) {
 
-	mx.HandleFunc("/api/state", func(w http.ResponseWriter, r *http.Request) {
+	mx.HandleFunc("/p2p/state", func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
 		h.Set("Content-Type", "text/event-stream")
 		h.Set("Cache-Control", "no-cache")
@@ -53,7 +53,7 @@ func (s *HttpServer) Register(mx *http.ServeMux) {
 		}
 	})
 
-	mx.HandleFunc("/api/connect", func(w http.ResponseWriter, r *http.Request) {
+	mx.HandleFunc("/p2p/connect", func(w http.ResponseWriter, r *http.Request) {
 
 		w.Header().Set("Content-Type", "application/json")
 
@@ -76,7 +76,7 @@ func (s *HttpServer) Register(mx *http.ServeMux) {
 		json.NewEncoder(w).Encode(s.p2p.State())
 	})
 
-	mx.HandleFunc("/api/handle", func(w http.ResponseWriter, r *http.Request) {
+	mx.HandleFunc("/p2p/message", func(w http.ResponseWriter, r *http.Request) {
 
 		w.Header().Set("content-type", "application/json")
 

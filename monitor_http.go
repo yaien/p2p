@@ -10,7 +10,7 @@ import (
 )
 
 func Subscribe2Http(ctx context.Context, addr string, out chan<- *State) error {
-	req, err := http.NewRequestWithContext(ctx, "GET", addr+"/api/state", nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", addr+"/p2p/state", nil)
 	if err != nil {
 		return fmt.Errorf("failed making state request: %w", err)
 	}

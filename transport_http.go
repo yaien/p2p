@@ -35,7 +35,7 @@ func (n *HttpTransport) Connect(from *Peer, addr string) (*State, error) {
 		return nil, fmt.Errorf("failed encoding current: %w", err)
 	}
 
-	url := fmt.Sprintf("%s/api/connect", addr)
+	url := fmt.Sprintf("%s/p2p/connect", addr)
 	req, err := http.NewRequest("POST", url, &buff)
 	if err != nil {
 		return nil, fmt.Errorf("failed creating request: %w", err)
@@ -70,7 +70,7 @@ func (n *HttpTransport) Send(from, to *Peer, subject string, body []byte) ([]byt
 		return nil, fmt.Errorf("failed encoding message: %w", err)
 	}
 
-	req, err := http.NewRequest("POST", to.Addr+"/api/handle", &buff)
+	req, err := http.NewRequest("POST", to.Addr+"/p2p/message", &buff)
 	if err != nil {
 		return nil, fmt.Errorf("failed creating request: %w", err)
 	}
