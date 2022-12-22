@@ -19,7 +19,7 @@ type HttpMessageReply struct {
 	Error string          `json:"error"`
 }
 
-type HttpNetwork struct {
+type HttpTransport struct {
 	Key string
 }
 
@@ -28,7 +28,7 @@ func signature(p *Peer, key string) string {
 	return fmt.Sprintf("%x", sha256.Sum256(source))
 }
 
-func (n *HttpNetwork) Connect(from *Peer, addr string) (*State, error) {
+func (n *HttpTransport) Connect(from *Peer, addr string) (*State, error) {
 	var buff bytes.Buffer
 	err := json.NewEncoder(&buff).Encode(from)
 	if err != nil {
@@ -63,7 +63,7 @@ func (n *HttpNetwork) Connect(from *Peer, addr string) (*State, error) {
 	return &state, nil
 }
 
-func (n *HttpNetwork) Send(from, to *Peer, subject string, body []byte) ([]byte, error) {
+func (n *HttpTransport) Send(from, to *Peer, subject string, body []byte) ([]byte, error) {
 	var buff bytes.Buffer
 	err := json.NewEncoder(&buff).Encode(&HttpMessage{From: from, Subject: subject, Body: body})
 	if err != nil {

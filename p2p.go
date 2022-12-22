@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 )
 
-type Network interface {
+type Transport interface {
 	Connect(from *Peer, addr string) (*State, error)
 	Send(from, to *Peer, subject string, body []byte) ([]byte, error)
 }
@@ -22,20 +22,20 @@ type Server interface {
 }
 
 type P2P struct {
-	current *Peer
-	lookup  []string
-	peers   map[string]*Peer
-	channel chan *State
-	mutex   sync.RWMutex
-	handler Handler
-	network Network
+	current   *Peer
+	lookup    []string
+	peers     map[string]*Peer
+	channel   chan *State
+	mutex     sync.RWMutex
+	handler   Handler
+	transport Transport
 }
 
 type Options struct {
-	Name    string
-	Addr    string
-	Lookup  []string
-	Network Network
+	Name      string
+	Addr      string
+	Lookup    []string
+	Transport Transport
 }
 
 func New(opts Options) *P2P {
@@ -50,12 +50,12 @@ func New(opts Options) *P2P {
 	}
 
 	p := &P2P{
-		current: current,
-		lookup:  opts.Lookup,
-		peers:   make(map[string]*Peer),
-		channel: make(chan *State),
-		handler: NewServeMux(),
-		network: opts.Network,
+		current:   current,
+		lookup:    opts.Lookup,
+		peers:     make(map[string]*Peer),
+		channel:   make(chan *State),
+		handler:   NewServeMux(),
+		transport: opts.Transport,
 	}
 
 	return p
@@ -71,8 +71,8 @@ func (p *P2P) SetCurrentAddr(addr string) {
 	p.current.RefreshedAt = time.Now().Format(time.RFC3339)
 }
 
-func (p *P2P) SetNetwork(n Network) {
-	p.network = n
+func (p *P2P) SetTransport(n Transport) {
+	p.transport = n
 }
 
 func (p *P2P) Handle(h Handler) {
@@ -153,9 +153,9 @@ func (p *P2P) register(peer *Peer) {
 }
 
 func (p *P2P) Discover(target string) error {
-	state, err := p.network.Connect(p.current, target)
+	state, err := p.transport.Connect(p.current, target)
 	if err != nil {
-		return fmt.Errorf("failed at network connect: %w", err)
+		return fmt.Errorf("failed at transport connect: %w", err)
 	}
 
 	peers := append(state.Peers, state.Current)

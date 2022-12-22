@@ -9,11 +9,11 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-type GrpcNetwork struct {
+type GrpcTransport struct {
 	clients sync.Map
 }
 
-func (n *GrpcNetwork) Connect(from *Peer, addr string) (*State, error) {
+func (n *GrpcTransport) Connect(from *Peer, addr string) (*State, error) {
 	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, fmt.Errorf("failed creating client connection: %w", err)
@@ -30,7 +30,7 @@ func (n *GrpcNetwork) Connect(from *Peer, addr string) (*State, error) {
 	return res.State, nil
 }
 
-func (n *GrpcNetwork) Send(from, to *Peer, subject string, body []byte) ([]byte, error) {
+func (n *GrpcTransport) Send(from, to *Peer, subject string, body []byte) ([]byte, error) {
 	v, ok := n.clients.Load(to.Id)
 	if !ok {
 		return nil, fmt.Errorf("missing client for peer id %s", to.Id)

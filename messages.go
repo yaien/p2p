@@ -20,7 +20,7 @@ func (p *P2P) Broadcast(pattern string, subject string, body []byte) error {
 			continue
 		}
 
-		p.network.Send(p.current, peer, subject, body)
+		p.transport.Send(p.current, peer, subject, body)
 
 	}
 
@@ -38,7 +38,7 @@ func (p *P2P) Request(pattern string, subj string, body []byte) ([]byte, error) 
 			continue
 		}
 
-		return p.network.Send(p.current, peer, subj, body)
+		return p.transport.Send(p.current, peer, subj, body)
 	}
 
 	return nil, fmt.Errorf("%w %s", ErrNoneMatchedPeers, pattern)

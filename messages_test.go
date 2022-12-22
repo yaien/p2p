@@ -21,14 +21,14 @@ func mockup(h p2p.HandlerFunc) (p2p.Handler, *bool) {
 }
 
 func TestP2P_Http_Broadcast(t *testing.T) {
-	network := &p2p.HttpNetwork{}
-	from := p2p.New(p2p.Options{Network: network})
+	transport := &p2p.HttpTransport{}
+	from := p2p.New(p2p.Options{Transport: transport})
 
 	mx := http.NewServeMux()
 	srv := httptest.NewServer(mx)
 	defer srv.Close()
 
-	to := p2p.New(p2p.Options{Addr: srv.URL, Name: "target-p2p", Network: network})
+	to := p2p.New(p2p.Options{Addr: srv.URL, Name: "target-p2p", Transport: transport})
 	p2p.NewHttpServer(to, nil, "").Register(mx)
 
 	handler, called := mockup(func(ctx context.Context, m *p2p.MessageRequest) ([]byte, error) {
@@ -54,14 +54,14 @@ func TestP2P_Http_Broadcast(t *testing.T) {
 }
 
 func TestP2P_Http_Request(t *testing.T) {
-	network := &p2p.HttpNetwork{}
-	from := p2p.New(p2p.Options{Network: network})
+	transport := &p2p.HttpTransport{}
+	from := p2p.New(p2p.Options{Transport: transport})
 
 	mx := http.NewServeMux()
 	srv := httptest.NewServer(mx)
 	defer srv.Close()
 
-	to := p2p.New(p2p.Options{Addr: srv.URL, Name: "target-p2p", Network: network})
+	to := p2p.New(p2p.Options{Addr: srv.URL, Name: "target-p2p", Transport: transport})
 
 	handler, called := mockup(func(ctx context.Context, m *p2p.MessageRequest) ([]byte, error) {
 		t.Log("message received", m)
@@ -90,15 +90,15 @@ func TestP2P_Http_Request(t *testing.T) {
 }
 
 func TestP2P_Grpc_Broadcast(t *testing.T) {
-	network := &p2p.GrpcNetwork{}
-	from := p2p.New(p2p.Options{Network: network})
+	transport := &p2p.GrpcTransport{}
+	from := p2p.New(p2p.Options{Transport: transport})
 
 	lis, err := nettest.NewLocalListener("tcp")
 	if err != nil {
 		t.Fatalf("failed at creating testing listener: %s", err)
 	}
 
-	to := p2p.New(p2p.Options{Addr: lis.Addr().String(), Name: "target-p2p", Network: network})
+	to := p2p.New(p2p.Options{Addr: lis.Addr().String(), Name: "target-p2p", Transport: transport})
 
 	handler, called := mockup(func(ctx context.Context, m *p2p.MessageRequest) ([]byte, error) {
 		t.Log("message received", m)
@@ -127,15 +127,15 @@ func TestP2P_Grpc_Broadcast(t *testing.T) {
 }
 
 func TestP2P_Grpc_Request(t *testing.T) {
-	network := &p2p.GrpcNetwork{}
-	from := p2p.New(p2p.Options{Network: network})
+	transport := &p2p.GrpcTransport{}
+	from := p2p.New(p2p.Options{Transport: transport})
 
 	lis, err := nettest.NewLocalListener("tcp")
 	if err != nil {
 		t.Fatalf("failed creating testing listener: %s", err)
 	}
 
-	to := p2p.New(p2p.Options{Addr: lis.Addr().String(), Name: "target-p2p", Network: network})
+	to := p2p.New(p2p.Options{Addr: lis.Addr().String(), Name: "target-p2p", Transport: transport})
 
 	handler, called := mockup(func(ctx context.Context, m *p2p.MessageRequest) ([]byte, error) {
 		t.Log("message received", m)
