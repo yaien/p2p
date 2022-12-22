@@ -136,6 +136,10 @@ func monitor() *cobra.Command {
 			monitor.SetContext(cmd.Context())
 			program := tea.NewProgram(monitor, tea.WithContext(cmd.Context()))
 			program.Run()
+			err := monitor.Error()
+			if err != nil {
+				log.Println(err)
+			}
 		},
 	}
 
